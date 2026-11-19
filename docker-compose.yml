@@ -1,0 +1,40 @@
+# Local stack.
+#
+#   docker compose up -d orders-db            # only PostgreSQL (run the API with npm)
+#   docker compose --profile app up --build   # PostgreSQL + the API container
+#
+# Credentials below are for local development only. In production inject secrets from a
+# secrets manager and never commit real values.
+services:
+  orders-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: orders_app
+      POSTGRES_PASSWORD: orders_pw
+      POSTGRES_DB: orders
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U orders_app -d orders']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    profiles: ['app']
+    build: .
+    depends_on:
+      orders-db:
+        condition: service_healthy
+    ports:
+      - '3000:3000'
+    environment:
+      # NODE_ENV=production in the image forbids AUTH_MODE=none, so this demo uses an API key.
+      AUTH_MODE: api-key
+      API_KEYS: demo-key-partner-a:partner-a
+      STORAGE: postgres
+      ORDERS_DB_URL: postgresql://orders_app:orders_pw@orders-db:5432/orders
+      # Production forbids ORDERS_DB_AUTO_SCHEMA; override NODE_ENV for this local demo so the table is created.
+      NODE_ENV: development
+      ORDERS_DB_AUTO_SCHEMA: 'true'
+    restart: unless-stopped
