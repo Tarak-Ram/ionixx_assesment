@@ -25,6 +25,8 @@ export interface TestAppOptions {
   database?: Type<OrdersDatabase>;
   /** Captures the JSON log lines. */
   logStream?: DestinationStream;
+  /** Runs after the HTTP pipeline is configured and before the app starts (e.g. to mount Swagger). */
+  beforeInit?: (app: INestApplication) => void;
 }
 
 export const MONDAY = '2026-11-16T10:00:00Z';
@@ -50,6 +52,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<INest
 
   const app = moduleRef.createNestApplication();
   configureApp(app);
+  options.beforeInit?.(app);
   await app.init();
   return app;
 }

@@ -1,11 +1,11 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { API_PREFIX, configureApp } from './bootstrap';
 import { loadConfig } from './config/app.config';
+import { setupSwagger } from './swagger';
 
 async function bootstrap(): Promise<void> {
   const config = loadConfig(); // fail fast on invalid configuration, before anything starts
@@ -19,16 +19,7 @@ async function bootstrap(): Promise<void> {
   app.disable('x-powered-by');
   configureApp(app);
 
-  if (config.swaggerEnabled) {
-    const swagger = new DocumentBuilder()
-      .setTitle('Order Splitter API')
-      .setDescription('Splits a BUY/SELL amount across a model portfolio and schedules the orders.')
-      .setVersion('1.0')
-      .addApiKey({ type: 'apiKey', name: 'X-API-Key', in: 'header' }, 'api-key')
-      .addBearerAuth()
-      .build();
-    SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, swagger));
-  }
+  if (config.swaggerEnabled) setupSwagger(app);
 
   app.enableShutdownHooks(); // closes the database pool cleanly on SIGTERM/SIGINT
   await app.listen(config.port, '0.0.0.0');

@@ -123,7 +123,7 @@ Invalid values stop the app at start-up with a list of every problem.
 ### 6. Run the tests and checks
 
 ```bash
-npm test               # 176 unit + integration tests (no external service needed)
+npm test               # 179 unit + integration tests (no external service needed)
 npm run test:cov       # with coverage; fails below the threshold
 npm run lint           # ESLint
 npm run typecheck      # TypeScript without emitting files
@@ -277,7 +277,7 @@ read side and a write side (interface segregation again).
 ### Quality and delivery
 | Measure | Detail |
 |---|---|
-| Tests | 176 tests: unit (domain, providers, config, use case with mocked ports) and integration (real HTTP pipeline via Supertest, PostgreSQL SQL via `pg-mem`) |
+| Tests | 179 tests: unit (domain, providers, config, use case with mocked ports) and integration (real HTTP pipeline via Supertest, PostgreSQL SQL via `pg-mem`) |
 | CI | GitHub Actions: lint, typecheck, tests with coverage gate, build, `npm audit`, image build (Node 20 and 22) |
 | Container | Multi-stage `Dockerfile`: production dependencies only, non-root, `HEALTHCHECK` |
 | Types and style | TypeScript `strict`, ESLint, Prettier |
@@ -363,6 +363,21 @@ curl -X POST http://localhost:3000/api/v1/orders/split \
 
 With a partner price (`"marketPrices": {"AAPL": 187.5}`) AAPL is priced at 187.5 (`priceSource: "PARTNER"`) → `quantity: "0.320"`.
 The response also sets `Location: /api/v1/orders/{id}`.
+
+### Swagger UI and OpenAPI
+
+Start the app and open **http://localhost:3000/docs** for interactive documentation: every endpoint,
+request and response schema with examples, the standard error body, the `Idempotency-Key` header,
+and an **Authorize** button for the API key or JWT (the value is remembered across page reloads).
+Use **Try it out** to call the API from the browser.
+
+| URL | What |
+|---|---|
+| `/docs` | Swagger UI |
+| `/docs-json` | Raw OpenAPI 3 document (import into Postman, Insomnia or a client generator) |
+
+Swagger is on by default and off when `NODE_ENV=production` (set `SWAGGER_ENABLED=true` to keep it).
+Health and metrics endpoints are intentionally not listed. Code: `src/swagger.ts`.
 
 ### Other endpoints
 
@@ -487,7 +502,7 @@ src/
     ├── auth/               # AuthStrategy port, guard, strategies (none, api-key, jwt, function)
     ├── health/             # liveness + readiness
     └── metrics/            # Prometheus
-test/{unit,integration}/    # 176 tests
+test/{unit,integration}/    # 179 tests
 Dockerfile, docker-compose.yml, .github/workflows/ci.yml, .env.example
 docs/architecture.md        # deeper design notes (some sections predate the hardening work)
 ```

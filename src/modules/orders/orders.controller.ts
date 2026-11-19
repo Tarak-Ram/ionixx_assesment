@@ -20,6 +20,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Response } from 'express';
+import { ErrorResponse } from '../../common/http/error.response';
 import { API_PREFIX } from '../../common/http/api-prefix';
 import { IdempotencyKey } from '../../common/http/idempotency-key.decorator';
 import { uuidParamPipe } from '../../common/http/uuid-param.pipe';
@@ -32,6 +33,9 @@ import { OrderListResponse, OrderResponse, toOrderResponse } from './dto/order.r
 import { SplitOrderDto } from './dto/split-order.dto';
 
 @ApiTags('orders')
+@ApiResponse({ status: 401, description: 'Missing or invalid credentials', type: ErrorResponse })
+@ApiResponse({ status: 403, description: 'Token lacks the required scope', type: ErrorResponse })
+@ApiResponse({ status: 429, description: 'Rate limit exceeded', type: ErrorResponse })
 @ApiSecurity('api-key')
 @ApiBearerAuth()
 @Controller('orders')
@@ -56,11 +60,12 @@ export class OrdersController {
     type: OrderResponse,
     description: 'Order calculated and stored in history',
   })
-  @ApiResponse({ status: 400, description: 'Malformed request body' })
+  @ApiResponse({ status: 400, description: 'Malformed request body', type: ErrorResponse })
   @ApiResponse({
     status: 422,
     description:
       'Business rule violated (e.g. weights do not sum to 100) or Idempotency-Key reused with a different body',
+    type: ErrorResponse,
   })
   async split(
     @Body() dto: SplitOrderDto,
@@ -90,7 +95,7 @@ export class OrdersController {
   @RequireScopes('orders:read')
   @ApiOperation({ summary: 'Get one historic order' })
   @ApiOkResponse({ type: OrderResponse })
-  @ApiResponse({ status: 404, description: 'Order not found' })
+  @ApiResponse({ status: 404, description: 'Order not found', type: ErrorResponse })
   async get(
     @Param('id', uuidParamPipe('id')) id: string,
     @CurrentPartner() principal: Principal,
