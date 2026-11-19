@@ -7,7 +7,7 @@ A NestJS + TypeScript REST API for a robo-advisor platform. A partner sends a mo
 
 > The service only *calculates order instructions*. It never places trades with a broker.
 
-**Contents:** [Quick start](#quick-start) · [Our approach](#our-approach-in-one-page) ·
+**Contents:** [Getting started](#getting-started) · [Our approach](#our-approach-in-one-page) ·
 [SOLID, with real examples](#solid-principles-where-to-see-them-in-the-code) ·
 [Measures we took](#measures-we-took) · [How to upgrade](#how-to-upgrade-recipes) ·
 [API](#api) · [Architecture](#architecture) · [Configuration](#configuration) ·
@@ -15,24 +15,164 @@ A NestJS + TypeScript REST API for a robo-advisor platform. A partner sends a mo
 
 ---
 
-## Quick start
+## Getting started
 
-Needs **Node.js ≥ 20** and npm. No database or other service is required.
+### 1. Prerequisites
+
+| Tool | Version | Needed for |
+|---|---|---|
+| Node.js | 20 or newer (22 recommended; `.nvmrc` pins 22) | Running and building |
+| npm | 10 or newer (comes with Node) | Installing dependencies |
+| Git | any | Cloning the repository |
+| Docker + Docker Compose | optional | Container run, local PostgreSQL |
+
+Check your versions:
 
 ```bash
-npm install
-npm run build
-npm start          # http://localhost:3000   Swagger UI: http://localhost:3000/docs
+node -v
+npm -v
 ```
 
-Other commands:
+No database, queue or other service is needed to run the default setup.
+
+### 2. Install
 
 ```bash
-npm test               # 176 unit + integration tests
-npm run test:cov       # with coverage (CI fails below the threshold)
-npm run lint && npm run typecheck
-docker compose --profile app up --build    # API + PostgreSQL in containers
+git clone https://github.com/Tarak-Ram/ionixx_assesment.git
+cd ionixx_assesment
+npm ci            # installs the exact versions from package-lock.json
 ```
+
+(`npm install` also works; `npm ci` is the reproducible choice.)
+
+### 3. Build and start
+
+```bash
+npm run build     # compiles TypeScript into dist/
+npm start         # runs dist/main.js
+```
+
+The server listens on **http://localhost:3000**. On start-up it logs one JSON line with the active
+configuration. The API base path is `/api/v1`; Swagger UI is at **http://localhost:3000/docs**.
+
+For development, build and start in one step: `npm run dev`. To recompile on every change, run
+`npm run start:dev` in one terminal and `npm start` in another (restart it after a rebuild).
+
+### 4. Check that it works
+
+```bash
+curl http://localhost:3000/api/v1/health
+# {"status":"ok"}
+```
+
+Send your first order (USD 100 split 60/40 between AAPL and TSLA):
+
+```bash
+curl -X POST http://localhost:3000/api/v1/orders/split \
+  -H "Content-Type: application/json" \
+  -d '{"type":"BUY","totalAmount":100,"portfolio":[{"symbol":"AAPL","weight":60},{"symbol":"TSLA","weight":40}]}'
+```
+
+On **Windows PowerShell** use this instead (`curl` there is an alias with different arguments):
+
+```powershell
+$body = '{"type":"BUY","totalAmount":100,"portfolio":[{"symbol":"AAPL","weight":60},{"symbol":"TSLA","weight":40}]}'
+Invoke-RestMethod -Method Post -Uri http://localhost:3000/api/v1/orders/split `
+  -ContentType 'application/json' -Body $body
+```
+
+Then read the history:
+
+```bash
+curl http://localhost:3000/api/v1/orders
+```
+
+The console shows one JSON log line per request. `responseTime` is the response time in milliseconds:
+
+```json
+{"level":30,"req":{"method":"POST","url":"/api/v1/orders/split"},"res":{"statusCode":201},"responseTime":4,"correlationId":"…","msg":"request completed"}
+```
+
+Stop the server with `Ctrl+C`. Order history is in memory, so it is gone after a restart (as required).
+
+### 5. Configure (optional)
+
+Every setting is an environment variable with a default; the app runs with none set. Full list:
+[Configuration](#configuration) and [.env.example](.env.example).
+
+```bash
+# macOS / Linux / Git Bash
+SHARE_PRECISION=7 PORT=4000 npm start
+```
+
+```powershell
+# Windows PowerShell
+$env:SHARE_PRECISION = 7; $env:PORT = 4000; npm start
+```
+
+To keep settings in a file, copy `.env.example` to `.env` and start with Node's built-in loader
+(Node 20.6+). The app does not read `.env` by itself:
+
+```bash
+cp .env.example .env          # then edit .env
+node --env-file=.env dist/main.js
+```
+
+Invalid values stop the app at start-up with a list of every problem.
+
+### 6. Run the tests and checks
+
+```bash
+npm test               # 176 unit + integration tests (no external service needed)
+npm run test:cov       # with coverage; fails below the threshold
+npm run lint           # ESLint
+npm run typecheck      # TypeScript without emitting files
+npm run bench          # load test; start the server first (see Performance)
+```
+
+### 7. Other ways to run
+
+**Docker (API + PostgreSQL):**
+
+```bash
+docker compose --profile app up --build     # API on http://localhost:3000
+```
+
+The demo container uses API-key authentication. Call it with `-H "X-API-Key: demo-key-partner-a"`.
+
+**With authentication enabled:**
+
+```bash
+AUTH_MODE=api-key API_KEYS=demo-a:partner-a npm start
+curl -H "X-API-Key: demo-a" http://localhost:3000/api/v1/orders
+```
+
+**With PostgreSQL storage (history survives restarts):**
+
+```bash
+docker compose up -d orders-db
+STORAGE=postgres ORDERS_DB_URL=postgresql://orders_app:orders_pw@localhost:5432/orders \
+ORDERS_DB_AUTO_SCHEMA=true npm start
+```
+
+**Production run** (refuses unsafe settings such as no authentication):
+
+```bash
+NODE_ENV=production AUTH_MODE=api-key API_KEYS=<key>:<partner> npm start
+```
+
+### 8. Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| `Invalid configuration: …` and exit code 1 | A variable has a bad value; the message lists each one. Fix it and start again |
+| `AUTH_MODE=none is not allowed when NODE_ENV=production` | Production requires `AUTH_MODE=api-key` or `jwt` |
+| `EADDRINUSE` | Port 3000 is taken. Set another `PORT` |
+| `Cannot find module …/dist/main.js` | Run `npm run build` first |
+| `429 RATE_LIMITED` | Too many requests from one IP. Raise `RATE_LIMIT_MAX` (for example when load testing) |
+| `/docs` returns 404 | Swagger is off in production. Set `SWAGGER_ENABLED=true` |
+| Database connection errors at start | Check `ORDERS_DB_URL`, that PostgreSQL is running, and `ORDERS_DB_SSL` |
+| `curl` JSON errors on Windows | Use the PowerShell example, or `curl.exe` with a body file: `-d @body.json` |
 
 ---
 
